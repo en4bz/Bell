@@ -1,3 +1,5 @@
 List of things to be done:
-1.) Getting fully working version with no bugs
-2.) Add more functionality
+1.) Get a fully working version with no bugs
+2.) Remove Dependancies on non-POSIX libraries
+3.) Add more functionality
+4.) Optimize
