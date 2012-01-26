@@ -46,7 +46,7 @@ int main(){
 		for(int i = 1; (temp = strtok(NULL, "\n ")) != NULL && i < MAX_ARGS; i++){
 			free(argv[i]);
 			argv[i] = strdup(temp);
-		} 
+		}
 		if(!strcmp(argv[0], "exit")){
 			exit(0);
 		}
@@ -74,11 +74,34 @@ int main(){
 		else if(!strcmp(argv[0], "env")){
 			env();
 		}
+		else if(!strcmp(argv[0], "set")){
+			char *name = strdup(strtok(argv[1], "="));
+			char *value = strdup(strtok(NULL,"\n "));
+			set(name, value);
+			free(name);
+			free(value);
+		}
+		else if(!strcmp(argv[0], "unset")){
+			unset(argv[1]);
+		}
+		else if(!strcmp(argv[0], "getenv")){
+			if((temp = getenv(argv[1])) != NULL){
+				printf("%s\n", temp);
+			}
+			else{
+				printf("(null)\n");
+			}
+		}
 		else{
 			int pid = fork();
 			if(pid == 0){
-				//Child
-				exit(0);
+				if(*(argv[0]) == '.'){
+
+				}
+				else{
+					//Look in PATH
+				}
+				exit(EXIT_FAILURE);
 			}
 			else{
 				//Parent
@@ -131,8 +154,8 @@ void history(void){
 }
 
 void env(void){
-	char **temp = environ; 
-	while(temp++ != NULL){
+	char **temp = environ;
+	for(;*temp != NULL; temp++){
 		printf("%s\n",*temp);
 	}
 	return;
