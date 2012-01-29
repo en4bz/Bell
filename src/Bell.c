@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
 #include "Stack.h"
 
 #define MAX_CMD_LEN 200
@@ -19,33 +21,89 @@ void history(void);
 void env(void);
 
 int main(){
-	char *prompt = "#";
 	char *argv[MAX_ARGS];
 	char *user = getlogin();
 	char host[20];
+	char *temp, tempArray[250];
 	gethostname(host,20);
 	for(int i = 0; i < MAX_ARGS; i++){
 		argv[i] = NULL;
 	}
+
 	Stack dStack;
 	dStack.top = -1;
 
+	int stdinBackup = dup(0);
+	int stdoutBackup = dup(1);
+
 	while(1){
+		for(int i = 0; i < MAX_ARGS; i++){
+			free(argv[i]);
+			argv[i] = NULL;
+		}
+		close(0);
+		dup(stdinBackup);
+		close(1);
+		dup(stdoutBackup);
 		char command[MAX_CMD_LEN];
-		char *temp = getcwd(NULL,0);
-		printf("%s@%s:[%s]%s", user, host, temp, prompt);
+		temp = getcwd(NULL,0);
+		printf("%s@%s:[%s]$", user, host, temp);
 		free(temp);
 		fgets(command, sizeof(command), stdin);
-		/*
-		FILE* openStream = fopen("~/.shellHistory","a");
+
+		char homedir[200];
+		sprintf(homedir, "%s/.shellHistory.txt", getenv("HOME"));
+		FILE* openStream = fopen(homedir,"a");
 		fputs(command, openStream);
 		fclose(openStream);
-		*/
+
+		int in = 0;
+		int out = 0;
 		free(argv[0]);
 		argv[0] = strdup(strtok(command, "\n "));
+		parser:
 		for(int i = 1; (temp = strtok(NULL, "\n ")) != NULL && i < MAX_ARGS; i++){
-			free(argv[i]);
 			argv[i] = strdup(temp);
+			if(*(argv[i]) == '<'){
+				in = i;
+			}
+			if(*(argv[i]) == '>'){
+				out = i;
+			}
+		}
+		if(in != 0){
+			close(0);
+			if(*(argv[in+1]) == '/'){
+				//Abs Path
+				open(argv[in+1], O_RDONLY);
+			}
+			else{	
+				//Rel Path
+				temp = getcwd(NULL,0);
+				sprintf(tempArray, "%s/%s", temp, argv[in+1]);
+				free(temp);
+				open(tempArray, O_RDONLY);
+			}
+			fgets(command, sizeof(command),stdin);
+			goto parser;
+		}
+		if(out != 0){
+			close(1);
+			if(*(argv[in+1]) == '/'){
+				//Abs Path
+				open(argv[out+1], O_WRONLY | O_APPEND |  O_CREAT);
+			}
+			else{
+				//Rel Path
+				temp = getcwd(NULL,0);
+				sprintf(tempArray, "%s/%s", temp, argv[out+1]);
+				free(temp);
+				open(tempArray, O_WRONLY | O_APPEND | O_CREAT);
+			}
+			for(int i = out; i < MAX_ARGS; i++){
+				free(argv[i]);
+				argv[i] = NULL;
+			}
 		}
 		if(!strcmp(argv[0], "exit")){
 			exit(0);
@@ -94,23 +152,31 @@ int main(){
 		}
 		else{
 			int pid = fork();
-			if(pid == 0){
-				if(*(argv[0]) == '.'){
-
+			if(pid == 0){	
+				char cmd[MAX_CMD_LEN];
+				if(*argv[0] == '.'  && *(argv[0]+1) == '/'){
+					//Look in cwd if "./"
+					char *t1 = getcwd(NULL, 0);
+					sprintf(cmd, "%s%s", t1, (argv[0]+1));
+					free(t1);
+					execvp(cmd, argv);
+					exit(EXIT_FAILURE);
 				}
 				else{
-					//Look in PATH
+					execvp(argv[0], argv);
+					exit(EXIT_FAILURE);
 				}
-				exit(EXIT_FAILURE);
 			}
 			else{
-				//Parent
+				int rCode;
+				wait(&rCode);
 			}
 		}
 	}
 }
 
 int cd(char *dir){
+	set("PWD", dir);
 	return chdir(dir);
 }
 
@@ -140,16 +206,21 @@ void popd(Stack *in){
 }
 
 void history(void){
-	FILE* openStream = fopen("~/.shellHistory", "r");
+	char homedir[200];
+	sprintf(homedir, "%s/.shellHistory.txt", getenv("HOME"));
+	FILE* openStream = fopen(homedir, "r");
+	//rewind(openStream);
 	if(openStream == NULL){
 		//Error
+		puts("Error");
 	}
 	else{
 		char temp[MAX_CMD_LEN];
 		while(fgets(temp, sizeof(temp), openStream) != NULL){
-			fputs(temp,stdin);
+			printf("%s",temp);
 		}
 	}
+	fclose(openStream);
 	return;
 }
 
