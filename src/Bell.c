@@ -91,14 +91,14 @@ int main(){
 			close(1);
 			if(*(argv[in+1]) == '/'){
 				//Abs Path
-				open(argv[out+1], O_WRONLY | O_APPEND |  O_CREAT);
+				open(argv[out+1], O_WRONLY | O_APPEND |  O_CREAT, 0666);
 			}
 			else{
 				//Rel Path
 				temp = getcwd(NULL,0);
 				sprintf(tempArray, "%s/%s", temp, argv[out+1]);
 				free(temp);
-				open(tempArray, O_WRONLY | O_APPEND | O_CREAT);
+				open(tempArray, O_WRONLY | O_APPEND | O_CREAT, 0666);
 			}
 			for(int i = out; i < MAX_ARGS; i++){
 				free(argv[i]);
