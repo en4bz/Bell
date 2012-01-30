@@ -19,6 +19,7 @@ void pushd(char*, Stack*);
 void popd(Stack*);
 void history(void);
 void env(void);
+void clearstdinBuffer(void);
 
 int main(){
 	char *argv[MAX_ARGS];
@@ -37,20 +38,22 @@ int main(){
 	int stdoutBackup = dup(1);
 
 	while(1){
+		close(0);
+		int x =  dup(stdinBackup);
+		close(1);
+		int y = dup(stdoutBackup);
 		for(int i = 0; i < MAX_ARGS; i++){
 			free(argv[i]);
 			argv[i] = NULL;
 		}
-		close(0);
-		dup(stdinBackup);
-		close(1);
-		dup(stdoutBackup);
 		char command[MAX_CMD_LEN];
 		temp = getcwd(NULL,0);
-		printf("%s@%s:[%s]$", user, host, temp);
+		printf("%s@%s:[%s]$ ", user, host, temp);
 		free(temp);
 		fgets(command, sizeof(command), stdin);
-
+		if(command[0] == '\n'){
+			continue;
+		}
 		char homedir[200];
 		sprintf(homedir, "%s/.shellHistory.txt", getenv("HOME"));
 		FILE* openStream = fopen(homedir,"a");
@@ -59,10 +62,10 @@ int main(){
 
 		int in = 0;
 		int out = 0;
+		int pipe = 0;
 		free(argv[0]);
-		argv[0] = strdup(strtok(command, "\n "));
-		parser:
-		for(int i = 1; (temp = strtok(NULL, "\n ")) != NULL && i < MAX_ARGS; i++){
+		argv[0] = strdup(strtok(command, "\n| "));
+		for(int i = 1; (temp = strtok(NULL, "\n| ")) != NULL && i < MAX_ARGS; i++){
 			argv[i] = strdup(temp);
 			if(*(argv[i]) == '<'){
 				in = i;
@@ -70,22 +73,9 @@ int main(){
 			if(*(argv[i]) == '>'){
 				out = i;
 			}
-		}
-		if(in != 0){
-			close(0);
-			if(*(argv[in+1]) == '/'){
-				//Abs Path
-				open(argv[in+1], O_RDONLY);
+			if(*(argv[i]) == '|'){
+				pipe = i;
 			}
-			else{	
-				//Rel Path
-				temp = getcwd(NULL,0);
-				sprintf(tempArray, "%s/%s", temp, argv[in+1]);
-				free(temp);
-				open(tempArray, O_RDONLY);
-			}
-			fgets(command, sizeof(command),stdin);
-			goto parser;
 		}
 		if(out != 0){
 			close(1);
@@ -100,10 +90,36 @@ int main(){
 				free(temp);
 				open(tempArray, O_WRONLY | O_APPEND | O_CREAT, 0666);
 			}
-			for(int i = out; i < MAX_ARGS; i++){
+			for(int i = out; i < MAX_ARGS && in == 0; i++){
 				free(argv[i]);
 				argv[i] = NULL;
 			}
+		}
+		if(in != 0){
+			close(0);
+			if(*(argv[in+1]) == '/'){
+				//Abs Path
+				open(argv[in+1], O_RDONLY);
+			}
+			else{
+				//Rel Path
+				temp = getcwd(NULL,0);
+				sprintf(tempArray, "%s/%s", temp, argv[in+1]);
+				free(temp);
+				open(tempArray, O_RDONLY);
+			}
+			fgets(command, sizeof(command),stdin);
+			free(argv[1]);
+			argv[1] = strdup(strtok(command, "\n "));
+			for(int i = 2; (temp = strtok(NULL, "\n ")) != NULL && i < MAX_ARGS; i++){
+				free(argv[i]);
+				argv[i] = NULL;
+				argv[i] = strdup(temp);
+			}
+			clearstdinBuffer();
+		}
+		if(pipe != 0){
+
 		}
 		if(!strcmp(argv[0], "exit")){
 			exit(0);
@@ -238,4 +254,9 @@ int set(const char *name, const char *value){
 
 int unset(const char *name){
 	return unsetenv(name); 
+}
+
+void clearstdinBuffer(void){
+	int ch;	
+	while ((ch = getchar()) != '\n' && ch != EOF);
 }
