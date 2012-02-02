@@ -63,7 +63,7 @@ int main(int argc, char *argv2[]){
 
 		short int in = 0;
 		short int out = 0;
-		short int pipe = 0;
+		short int isPipe = 0;
 		free(argv[0]);
 		argv[0] = strdup(strtok(command, "\n| "));
 		for(short int i = 1; (temp = strtok(NULL, "\n| ")) != NULL && i < MAX_ARGS; i++){
@@ -75,7 +75,7 @@ int main(int argc, char *argv2[]){
 				out = i;
 			}
 			if(*(argv[i]) == '|'){
-				pipe = i;
+				isPipe = i;
 			}
 		}
 		if(out != 0){
@@ -119,9 +119,9 @@ int main(int argc, char *argv2[]){
 			}
 			clearstdinBuffer();
 		}
-		if(pipe != 0){
+		if(isPipe != 0){
 			int fileDes[2];
-			int abc = pipe2(fileDes, 0);
+			pipe(fileDes);
      			//argv[0] = write fileDes[1]
 			//argv[pipe+1] = read fileDes[0]
 		}
