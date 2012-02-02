@@ -129,6 +129,8 @@ int main(void){
 				}
 				close(1);
 				dup(fileDes[1]);
+				close(fileDes[0]);
+				close(fileDes[1]);
 				execvp(argv[0], argv);
 				exit(EXIT_FAILURE);
 			}
@@ -139,15 +141,16 @@ int main(void){
 				wait(&rCode);
 				close(0);
 				dup(fileDes[0]);
+				close(fileDes[0]);
+				close(fileDes[1]);
 				free(argv[0]);
 				argv[0] = argv[isPipe+1];
 				for(int i = 1; i < MAX_ARGS; i++){
-					if(!(i == isPipe+1)){
+					if(i != isPipe+1){
 						free(argv[i]);
 					}
 					argv[i] = NULL;
 				}
-				isPipe = 0;
 			}
 		}
 		if(!strcmp(argv[0], "exit")){
