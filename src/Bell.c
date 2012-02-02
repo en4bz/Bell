@@ -22,12 +22,16 @@ void env(void);
 void clearstdinBuffer(void);
 
 
-int main(int argc, char *argv2[]){
+int main(void){
 	char *argv[MAX_ARGS];
 	char *user = getlogin();
 	char host[20];
 	char *temp, tempArray[250];
 	gethostname(host,20);
+
+	char homedir[200];
+	sprintf(homedir, "%s/.shellHistory.txt", getenv("HOME"));
+
 	for(short int i = 0; i < MAX_ARGS; i++){
 		argv[i] = NULL;
 	}
@@ -55,8 +59,6 @@ int main(int argc, char *argv2[]){
 		if(command[0] == '\n'){
 			continue;
 		}
-		char homedir[200];
-		sprintf(homedir, "%s/.shellHistory.txt", getenv("HOME"));
 		FILE* openStream = fopen(homedir,"a");
 		fputs(command, openStream);
 		fclose(openStream);
@@ -65,8 +67,8 @@ int main(int argc, char *argv2[]){
 		short int out = 0;
 		short int isPipe = 0;
 		free(argv[0]);
-		argv[0] = strdup(strtok(command, "\n| "));
-		for(short int i = 1; (temp = strtok(NULL, "\n| ")) != NULL && i < MAX_ARGS; i++){
+		argv[0] = strdup(strtok(command, "\n "));
+		for(short int i = 1; (temp = strtok(NULL, "\n ")) != NULL && i < MAX_ARGS; i++){
 			argv[i] = strdup(temp);
 			if(*(argv[i]) == '<'){
 				in = i;
@@ -109,21 +111,44 @@ int main(int argc, char *argv2[]){
 				free(temp);
 				open(tempArray, O_RDONLY);
 			}
-			fgets(command, sizeof(command),stdin);
-			free(argv[1]);
-			argv[1] = strdup(strtok(command, "\n "));
-			for(short int i = 2; (temp = strtok(NULL, "\n ")) != NULL && i < MAX_ARGS; i++){
+			for(int i = in; i < MAX_ARGS; i++){
 				free(argv[i]);
 				argv[i] = NULL;
-				argv[i] = strdup(temp);
 			}
-			clearstdinBuffer();
 		}
 		if(isPipe != 0){
 			int fileDes[2];
 			pipe(fileDes);
-     			//argv[0] = write fileDes[1]
-			//argv[pipe+1] = read fileDes[0]
+			int pid = fork();
+			if(pid == 0){
+				//Child Peforms first action and 
+				//prints to stdin buffer
+				for(int i = isPipe; i < MAX_ARGS; i++){
+					free(argv[i]);
+					argv[i] = NULL;
+				}
+				close(1);
+				dup(fileDes[1]);
+				execvp(argv[0], argv);
+				exit(EXIT_FAILURE);
+			}
+			else{	
+				//Parent waits for child then reads 
+				//from stdin
+				int rCode;
+				wait(&rCode);
+				close(0);
+				dup(fileDes[0]);
+				free(argv[0]);
+				argv[0] = argv[isPipe+1];
+				for(int i = 1; i < MAX_ARGS; i++){
+					if(!(i == isPipe+1)){
+						free(argv[i]);
+					}
+					argv[i] = NULL;
+				}
+				isPipe = 0;
+			}
 		}
 		if(!strcmp(argv[0], "exit")){
 			exit(0);
@@ -176,16 +201,14 @@ int main(int argc, char *argv2[]){
 				char cmd[MAX_CMD_LEN];
 				if(*argv[0] == '.'  && *(argv[0]+1) == '/'){
 					//Look in cwd if "./"
-					char *t1 = getcwd(NULL, 0);
-					sprintf(cmd, "%s%s", t1, (argv[0]+1));
-					free(t1);
+					sprintf(cmd, "%s%s", getenv("PWD"), (argv[0]+1));
 					execvp(cmd, argv);
-					exit(EXIT_FAILURE);
+					
 				}
 				else{
 					execvp(argv[0], argv);
-					exit(EXIT_FAILURE);
 				}
+				exit(EXIT_FAILURE);
 			}
 			else{
 				int rCode;
