@@ -1,6 +1,5 @@
 List of things to be done:
-1.) Get a fully working version with no bugs
+1.) Remove Dependancies on non-POSIX libraries
 2.) Modularize the project
-3.) Remove Dependancies on non-POSIX libraries
-4.) Add more functionality
-5.) Optimize
+3.) Add more functionality (pipes)
+4.) Optimize
