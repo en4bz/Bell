@@ -21,28 +21,29 @@ void history(void);
 void env(void);
 void clearstdinBuffer(void);
 
-int main(){
+
+int main(int argc, char *argv2[]){
 	char *argv[MAX_ARGS];
 	char *user = getlogin();
 	char host[20];
 	char *temp, tempArray[250];
 	gethostname(host,20);
-	for(int i = 0; i < MAX_ARGS; i++){
+	for(short int i = 0; i < MAX_ARGS; i++){
 		argv[i] = NULL;
 	}
 
 	Stack dStack;
 	dStack.top = -1;
 
-	int stdinBackup = dup(0);
-	int stdoutBackup = dup(1);
+	short int stdinBackup = dup(0);
+	short int stdoutBackup = dup(1);
 
 	while(1){
 		close(0);
-		int x =  dup(stdinBackup);
+		dup(stdinBackup);
 		close(1);
-		int y = dup(stdoutBackup);
-		for(int i = 0; i < MAX_ARGS; i++){
+		dup(stdoutBackup);
+		for(short int i = 0; i < MAX_ARGS; i++){
 			free(argv[i]);
 			argv[i] = NULL;
 		}
@@ -60,12 +61,12 @@ int main(){
 		fputs(command, openStream);
 		fclose(openStream);
 
-		int in = 0;
-		int out = 0;
-		int pipe = 0;
+		short int in = 0;
+		short int out = 0;
+		short int pipe = 0;
 		free(argv[0]);
 		argv[0] = strdup(strtok(command, "\n| "));
-		for(int i = 1; (temp = strtok(NULL, "\n| ")) != NULL && i < MAX_ARGS; i++){
+		for(short int i = 1; (temp = strtok(NULL, "\n| ")) != NULL && i < MAX_ARGS; i++){
 			argv[i] = strdup(temp);
 			if(*(argv[i]) == '<'){
 				in = i;
@@ -111,7 +112,7 @@ int main(){
 			fgets(command, sizeof(command),stdin);
 			free(argv[1]);
 			argv[1] = strdup(strtok(command, "\n "));
-			for(int i = 2; (temp = strtok(NULL, "\n ")) != NULL && i < MAX_ARGS; i++){
+			for(short int i = 2; (temp = strtok(NULL, "\n ")) != NULL && i < MAX_ARGS; i++){
 				free(argv[i]);
 				argv[i] = NULL;
 				argv[i] = strdup(temp);
@@ -119,13 +120,16 @@ int main(){
 			clearstdinBuffer();
 		}
 		if(pipe != 0){
-
+			int fileDes[2];
+			int abc = pipe2(fileDes, 0);
+     			//argv[0] = write fileDes[1]
+			//argv[pipe+1] = read fileDes[0]
 		}
 		if(!strcmp(argv[0], "exit")){
 			exit(0);
 		}
 		else if(!strcmp(argv[0], "echo")){
-			for(int i = 1; i < MAX_ARGS && argv[i] != NULL; i++){
+			for(short int i = 1; i < MAX_ARGS && argv[i] != NULL; i++){
 				printf("%s ", argv[i]);
 			}
 			printf("\n");
@@ -257,6 +261,6 @@ int unset(const char *name){
 }
 
 void clearstdinBuffer(void){
-	int ch;	
+	char ch;	
 	while ((ch = getchar()) != '\n' && ch != EOF);
 }
