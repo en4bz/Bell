@@ -14,20 +14,20 @@ extern char **environ;
 int cd(char*);
 int set(const char*, const char*);
 int unset(const char*);
-void pwd(void);
-void pushd(char*, Stack*);
-void popd(Stack*);
-void history(void);
-void env(void);
+int pwd(void);
+int pushd(char*, Stack*);
+int popd(Stack*);
+int history(void);
+int env(void);
 void clearstdinBuffer(void);
 
 
 int main(void){
 	char *argv[MAX_ARGS];
-	char *user = getlogin();
+	char *user = getenv("USER");
 	char host[20];
 	char *temp, tempArray[250];
-	gethostname(host,20);
+	gethostname(host, sizeof(host));
 
 	char homedir[200];
 	sprintf(homedir, "%s/.shellHistory.txt", getenv("HOME"));
@@ -42,6 +42,8 @@ int main(void){
 	short int stdinBackup = dup(0);
 	short int stdoutBackup = dup(1);
 
+	int rCode;
+
 	while(1){
 		close(0);
 		dup(stdinBackup);
@@ -52,11 +54,11 @@ int main(void){
 			argv[i] = NULL;
 		}
 		char command[MAX_CMD_LEN];
-		temp = getcwd(NULL,0);
-		printf("%s@%s:[%s]$ ", user, host, temp);
+		//Print Prompt
+		printf("%s@%s:[%s]$ ", user, host, (temp = getcwd(NULL, 0)));
 		free(temp);
 		fgets(command, sizeof(command), stdin);
-		if(command[0] == '\n'){
+		if(command[0] == '\n' || command == NULL){
 			continue;
 		}
 		FILE* openStream = fopen(homedir,"a");
@@ -93,7 +95,7 @@ int main(void){
 				free(temp);
 				open(tempArray, O_WRONLY | O_APPEND | O_CREAT, 0666);
 			}
-			for(int i = out; i < MAX_ARGS && in == 0; i++){
+			for(short int i = out; i < MAX_ARGS && in == 0; i++){
 				free(argv[i]);
 				argv[i] = NULL;
 			}
@@ -111,7 +113,7 @@ int main(void){
 				free(temp);
 				open(tempArray, O_RDONLY);
 			}
-			for(int i = in; i < MAX_ARGS; i++){
+			for(short int i = in; i < MAX_ARGS; i++){
 				free(argv[i]);
 				argv[i] = NULL;
 			}
@@ -121,9 +123,8 @@ int main(void){
 			pipe(fileDes);
 			int pid = fork();
 			if(pid == 0){
-				//Child Peforms first action and 
-				//prints to stdin buffer
-				for(int i = isPipe; i < MAX_ARGS; i++){
+				//Child Peforms first action and prints to pipe
+				for(short int i = isPipe; i < MAX_ARGS; i++){
 					free(argv[i]);
 					argv[i] = NULL;
 				}
@@ -131,13 +132,11 @@ int main(void){
 				dup(fileDes[1]);
 				close(fileDes[0]);
 				close(fileDes[1]);
-				execvp(argv[0], argv);
+				rCode = execvp(argv[0], argv);
 				exit(EXIT_FAILURE);
 			}
-			else{	
-				//Parent waits for child then reads 
-				//from stdin
-				int rCode;
+			else{
+				//Parent waits for child then reads from pipe
 				wait(&rCode);
 				close(0);
 				dup(fileDes[0]);
@@ -145,7 +144,7 @@ int main(void){
 				close(fileDes[1]);
 				free(argv[0]);
 				argv[0] = argv[isPipe+1];
-				for(int i = 1; i < MAX_ARGS; i++){
+				for(short int i = 1; i < MAX_ARGS; i++){
 					if(i != isPipe+1){
 						free(argv[i]);
 					}
@@ -154,59 +153,62 @@ int main(void){
 			}
 		}
 		if(!strcmp(argv[0], "exit")){
-			exit(0);
+			exit(EXIT_SUCCESS);
 		}
 		else if(!strcmp(argv[0], "echo")){
-			for(short int i = 1; i < MAX_ARGS && argv[i] != NULL; i++){
-				printf("%s ", argv[i]);
+			if(*(argv[1]) == '$' && *(argv[1]+1) == '?'){
+				printf("%d", rCode);
+			}
+			else{
+				for(short int i = 1; i < MAX_ARGS && argv[i] != NULL; i++){
+					printf("%s ", argv[i]);
+					rCode = EXIT_SUCCESS;
+				}
 			}
 			printf("\n");
 		}
 		else if(!strcmp(argv[0], "cd")){
-			int rCode = cd(argv[1]);
+			rCode = cd(argv[1]);
+			set("PWD", (temp = getcwd(NULL,0)));
+			free(temp);
 		}
 		else if(!strcmp(argv[0], "pwd")){
-			pwd();
+			rCode = pwd();
 		}
 		else if(!strcmp(argv[0], "pushd")){
-			pushd(argv[1], &dStack);
+			rCode = pushd(argv[1], &dStack);
+			set("PWD", (temp = getcwd(NULL,0)));
+			free(temp);
 		}
 		else if(!strcmp(argv[0], "popd")){
-			popd(&dStack);
+			rCode = popd(&dStack);
+			set("PWD", (temp = getcwd(NULL,0)));
+			free(temp);
 		}
 		else if(!strcmp(argv[0], "history")){
-			history();
+			rCode = history();
 		}
 		else if(!strcmp(argv[0], "env")){
-			env();
+			rCode = env();
 		}
 		else if(!strcmp(argv[0], "set")){
 			char *name = strdup(strtok(argv[1], "="));
 			char *value = strdup(strtok(NULL,"\n "));
-			set(name, value);
+			rCode = set(name, value);
 			free(name);
 			free(value);
 		}
 		else if(!strcmp(argv[0], "unset")){
-			unset(argv[1]);
-		}
-		else if(!strcmp(argv[0], "getenv")){
-			if((temp = getenv(argv[1])) != NULL){
-				printf("%s\n", temp);
-			}
-			else{
-				printf("(null)\n");
-			}
+			rCode = unset(argv[1]);
 		}
 		else{
 			int pid = fork();
-			if(pid == 0){	
+			if(pid == 0){
 				char cmd[MAX_CMD_LEN];
 				if(*argv[0] == '.'  && *(argv[0]+1) == '/'){
 					//Look in cwd if "./"
 					sprintf(cmd, "%s%s", getenv("PWD"), (argv[0]+1));
 					execvp(cmd, argv);
-					
 				}
 				else{
 					execvp(argv[0], argv);
@@ -214,7 +216,6 @@ int main(void){
 				exit(EXIT_FAILURE);
 			}
 			else{
-				int rCode;
 				wait(&rCode);
 			}
 		}
@@ -222,43 +223,42 @@ int main(void){
 }
 
 int cd(char *dir){
-	set("PWD", dir);
 	return chdir(dir);
 }
 
-void pwd(void){
-	char *dir = getcwd(NULL,0);
-	printf("%s\n", dir);
+int pwd(void){
+	char *dir;
+	printf("%s\n", (dir = getcwd(NULL,0)));
 	free(dir);
-	return;
+	return EXIT_SUCCESS;
 }
 
-void pushd(char* dir, Stack *in){
+int pushd(char* dir, Stack *in){
 	in->stack[++in->top] = getcwd(NULL,0);
 	cd(dir);
-	return;
+	return EXIT_SUCCESS;
 }
 
-void popd(Stack *in){
+int popd(Stack *in){
 	if(in->top == -1){
-		return;
+		return EXIT_FAILURE;
 	}
 	else{
 		char *temp = in->stack[in->top--];
 		cd(temp);
 		free(temp);
+		return EXIT_SUCCESS;
 	}
-	return;
 }
 
-void history(void){
+int history(void){
 	char homedir[200];
 	sprintf(homedir, "%s/.shellHistory.txt", getenv("HOME"));
 	FILE* openStream = fopen(homedir, "r");
 	//rewind(openStream);
 	if(openStream == NULL){
-		//Error
 		puts("Error");
+		return EXIT_FAILURE;
 	}
 	else{
 		char temp[MAX_CMD_LEN];
@@ -267,26 +267,26 @@ void history(void){
 		}
 	}
 	fclose(openStream);
-	return;
+	return EXIT_SUCCESS;
 }
 
-void env(void){
+int env(void){
 	char **temp = environ;
 	for(;*temp != NULL; temp++){
 		printf("%s\n",*temp);
 	}
-	return;
+	return EXIT_SUCCESS;
 }
 
 int set(const char *name, const char *value){
 	return setenv(name, value, 1);
-} 
+}
 
 int unset(const char *name){
-	return unsetenv(name); 
+	return unsetenv(name);
 }
 
 void clearstdinBuffer(void){
-	char ch;	
+	char ch;
 	while ((ch = getchar()) != '\n' && ch != EOF);
 }
