@@ -32,15 +32,15 @@ int main(void){
 	char homedir[200];
 	sprintf(homedir, "%s/.shellHistory.txt", getenv("HOME"));
 
-	for(short int i = 0; i < MAX_ARGS; i++){
+	for(int i = 0; i < MAX_ARGS; i++){
 		argv[i] = NULL;
 	}
 
 	Stack dStack;
 	dStack.top = -1;
 
-	short int stdinBackup = dup(0);
-	short int stdoutBackup = dup(1);
+	int stdinBackup = dup(0);
+	int stdoutBackup = dup(1);
 
 	int rCode;
 
@@ -49,7 +49,7 @@ int main(void){
 		dup(stdinBackup);
 		close(1);
 		dup(stdoutBackup);
-		for(short int i = 0; i < MAX_ARGS; i++){
+		for(int i = 0; i < MAX_ARGS; i++){
 			free(argv[i]);
 			argv[i] = NULL;
 		}
@@ -65,12 +65,12 @@ int main(void){
 		fputs(command, openStream);
 		fclose(openStream);
 
-		short int in = 0;
-		short int out = 0;
-		short int isPipe = 0;
+		int in = 0;
+		int out = 0;
+		int isPipe = 0;
 		free(argv[0]);
 		argv[0] = strdup(strtok(command, "\n "));
-		for(short int i = 1; (temp = strtok(NULL, "\n ")) != NULL && i < MAX_ARGS; i++){
+		for(int i = 1; (temp = strtok(NULL, "\n ")) != NULL && i < MAX_ARGS; i++){
 			argv[i] = strdup(temp);
 			if(*(argv[i]) == '<'){
 				in = i;
@@ -113,7 +113,7 @@ int main(void){
 				free(temp);
 				open(tempArray, O_RDONLY);
 			}
-			for(short int i = in; i < MAX_ARGS; i++){
+			for(int i = in; i < MAX_ARGS; i++){
 				free(argv[i]);
 				argv[i] = NULL;
 			}
@@ -124,7 +124,7 @@ int main(void){
 			int pid = fork();
 			if(pid == 0){
 				//Child Peforms first action and prints to pipe
-				for(short int i = isPipe; i < MAX_ARGS; i++){
+				for(int i = isPipe; i < MAX_ARGS; i++){
 					free(argv[i]);
 					argv[i] = NULL;
 				}
@@ -144,7 +144,7 @@ int main(void){
 				close(fileDes[1]);
 				free(argv[0]);
 				argv[0] = argv[isPipe+1];
-				for(short int i = 1; i < MAX_ARGS; i++){
+				for(int i = 1; i < MAX_ARGS; i++){
 					if(i != isPipe+1){
 						free(argv[i]);
 					}
@@ -160,7 +160,7 @@ int main(void){
 				printf("%d", rCode);
 			}
 			else{
-				for(short int i = 1; i < MAX_ARGS && argv[i] != NULL; i++){
+				for(int i = 1; i < MAX_ARGS && argv[i] != NULL; i++){
 					printf("%s ", argv[i]);
 					rCode = EXIT_SUCCESS;
 				}
