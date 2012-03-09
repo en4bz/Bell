@@ -1,5 +1,4 @@
 List of things to be done:
-1.) Remove Dependancies on non-POSIX libraries
-2.) Modularize the project
-3.) Add more functionality (pipes)
-4.) Optimize
+1.) Modularize the project
+2.) Add more functionality (allow scripting)
+3.) Optimize
