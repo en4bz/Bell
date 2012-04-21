@@ -1,18 +1,16 @@
 #include "bell.h"
 
 int main(void){
-	char *argv[MAX_ARGS];
+	static char *argv[MAX_ARGS];
 	char *user = getenv("USER");
+	char *workingDir = getcwd(NULL, 0);
 	char host[20];
 	char *temp, tempArray[250];
 	gethostname(host, sizeof(host));
 
 	char homedir[200];
 	sprintf(homedir, "%s/.shellHistory.txt", getenv("HOME"));
-
-	for(int i = 0; i < MAX_ARGS; i++){
-		argv[i] = NULL;
-	}
+	FILE* openStream = fopen(homedir,"a");
 
 	Stack dStack;
 	dStack.top = -1;
@@ -23,26 +21,14 @@ int main(void){
 	int rCode;
 
 	while(1){
-		close(0);
-		dup(stdinBackup);
-		close(1);
-		dup(stdoutBackup);
-		for(int i = 0; i < MAX_ARGS; i++){
-			free(argv[i]);
-			argv[i] = NULL;
-		}
 		char command[MAX_CMD_LEN];
 		//Print Prompt
-		printf("%s@%s:[%s]$ ", user, host, (temp = getcwd(NULL, 0)));
-		free(temp);
-		fgets(command, sizeof(command), stdin);
+		printf("%s@%s:[%s]$ ", user, host, workingDir);
+		fgets(command, sizeof command, stdin);
 		if(command[0] == '\n' || command == NULL){
 			continue;
 		}
-		FILE* openStream = fopen(homedir,"a");
 		fputs(command, openStream);
-		fclose(openStream);
-
 		int in = 0;
 		int out = 0;
 		int isPipe = 0;
@@ -68,9 +54,7 @@ int main(void){
 			}
 			else{
 				//Rel Path
-				temp = getcwd(NULL,0);
-				sprintf(tempArray, "%s/%s", temp, argv[out+1]);
-				free(temp);
+				sprintf(tempArray, "%s/%s", workingDir, argv[out+1]);
 				open(tempArray, O_WRONLY | O_APPEND | O_CREAT, 0666);
 			}
 			for(short int i = out; i < MAX_ARGS && in == 0; i++){
@@ -86,9 +70,7 @@ int main(void){
 			}
 			else{
 				//Rel Path
-				temp = getcwd(NULL,0);
-				sprintf(tempArray, "%s/%s", temp, argv[in+1]);
-				free(temp);
+				sprintf(tempArray, "%s/%s", workingDir, argv[in+1]);
 				open(tempArray, O_RDONLY);
 			}
 			for(int i = in; i < MAX_ARGS; i++){
@@ -131,7 +113,7 @@ int main(void){
 			}
 		}
 		if(!strcmp(argv[0], "exit")){
-			exit(EXIT_SUCCESS);
+			break;
 		}
 		else if(!strcmp(argv[0], "echo")){
 			if(*(argv[1]) == '$' && *(argv[1]+1) == '?'){
@@ -140,28 +122,33 @@ int main(void){
 			else{
 				for(int i = 1; i < MAX_ARGS && argv[i] != NULL; i++){
 					printf("%s ", argv[i]);
-					rCode = EXIT_SUCCESS;
+					rCode = 0;
 				}
 			}
 			printf("\n");
 		}
 		else if(!strcmp(argv[0], "cd")){
-			rCode = cd(argv[1]);
-			set("PWD", (temp = getcwd(NULL,0)));
-			free(temp);
+			if(argv[1] == NULL){
+				rCode = cd(homedir);
+			}
+			else{
+				rCode = cd(argv[1]);
+			}
+			free(workingDir);
+			set("PWD", (workingDir = getcwd(NULL,0)));
 		}
 		else if(!strcmp(argv[0], "pwd")){
 			rCode = pwd();
 		}
 		else if(!strcmp(argv[0], "pushd")){
 			rCode = pushd(argv[1], &dStack);
-			set("PWD", (temp = getcwd(NULL,0)));
-			free(temp);
+			free(workingDir);
+			set("PWD", (workingDir = getcwd(NULL,0)));
 		}
 		else if(!strcmp(argv[0], "popd")){
 			rCode = popd(&dStack);
-			set("PWD", (temp = getcwd(NULL,0)));
-			free(temp);
+			free(workingDir);
+			set("PWD", (workingDir = getcwd(NULL,0)));
 		}
 		else if(!strcmp(argv[0], "history")){
 			rCode = history();
@@ -182,11 +169,10 @@ int main(void){
 		else{
 			int pid = fork();
 			if(pid == 0){
-				char cmd[MAX_CMD_LEN];
 				if(*argv[0] == '.'  && *(argv[0]+1) == '/'){
 					//Look in cwd if "./"
-					sprintf(cmd, "%s%s", getenv("PWD"), (argv[0]+1));
-					execvp(cmd, argv);
+					sprintf(tempArray, "%s%s", getenv("PWD"), (argv[0]+1));
+					execvp(tempArray, argv);
 				}
 				else{
 					execvp(argv[0], argv);
@@ -197,5 +183,15 @@ int main(void){
 				wait(&rCode);
 			}
 		}
+		close(0);
+		dup(stdinBackup);
+		close(1);
+		dup(stdoutBackup);
+		for(int i = 0; i < MAX_ARGS; i++){
+			free(argv[i]);
+			argv[i] = NULL;
+		}
 	}
+	fclose(openStream);
+	return rCode;
 }
