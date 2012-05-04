@@ -192,6 +192,7 @@ int main(void){
 			argv[i] = NULL;
 		}
 	}
+	free(workingDir);
 	fclose(openStream);
 	return rCode;
 }
